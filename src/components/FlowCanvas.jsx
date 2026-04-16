@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { COLORS } from '../lib/mockData'
 
 // Node center positions in SVG coordinate space (viewBox 0 0 1000 540)
@@ -10,6 +11,7 @@ export const NODE_POS = {
 }
 
 const NODE_RADIUS = 56
+const PARTICLE_COUNT = 3
 
 function bezierPath(from, to) {
   const dx = to.x - from.x
@@ -28,70 +30,93 @@ function bezierPath(from, to) {
   return `M ${fx},${fy} C ${cx1},${cy1} ${cx2},${cy2} ${tx},${ty}`
 }
 
-// Map wattage to particle travel duration in seconds (higher W = faster)
+// Higher watts → shorter duration (ms) → faster particles
 function wattsToDuration(watts) {
   if (!watts || watts <= 0) return null
-  return Math.max(1.2, Math.min(5.0, 5.0 - (watts / 1100) * 3.8))
+  return Math.max(1200, Math.min(5000, 5000 - (watts / 1100) * 3800))
 }
 
-const PARTICLE_COUNT = 3
-
-function FlowParticles({ flowId, color, duration }) {
-  if (!duration) return null
-  return Array.from({ length: PARTICLE_COUNT }, (_, i) => {
-    const begin = `${((duration / PARTICLE_COUNT) * i).toFixed(2)}s`
-    return (
-      <circle key={i} r="5" fill={color} filter={`url(#glow-${flowId})`}>
-        <animateMotion
-          dur={`${duration.toFixed(2)}s`}
-          begin={begin}
-          repeatCount="indefinite"
-          calcMode="linear"
-          rotate="auto"
-        >
-          <mpath href={`#path-${flowId}`} />
-        </animateMotion>
-      </circle>
-    )
-  })
-}
-
-export default function FlowCanvas({ data }) {
-  // data shape: { solar, battery, consumption, grid } each with { watts }
-  const FLOWS = [
+function buildFlows(data) {
+  return [
     {
-      id:    'solar-center',
-      from:  'solar',
-      to:    'center',
-      color: COLORS.solar,
-      watts: data?.solar?.watts ?? 0,
+      id:      'solar-center',
+      from:    'solar',
+      to:      'center',
+      color:   COLORS.solar,
+      watts:   data?.solar?.watts ?? 0,
+      reverse: false,
     },
     {
-      id:    'center-battery',
-      from:  'center',
-      to:    'battery',
-      color: COLORS.battery,
-      watts: data?.battery?.watts ?? 0,
-      // Reverse direction if discharging
+      id:      'center-battery',
+      from:    'center',
+      to:      'battery',
+      color:   COLORS.battery,
+      watts:   data?.battery?.watts ?? 0,
       reverse: data?.battery?.charging === false,
     },
     {
-      id:    'center-consumption',
-      from:  'center',
-      to:    'consumption',
-      color: COLORS.consumption,
-      watts: data?.consumption?.watts ?? 0,
+      id:      'center-consumption',
+      from:    'center',
+      to:      'consumption',
+      color:   COLORS.consumption,
+      watts:   data?.consumption?.watts ?? 0,
+      reverse: false,
     },
     {
-      id:    'center-grid',
-      from:  'center',
-      to:    'grid',
-      color: COLORS.grid,
-      watts: data?.grid?.watts ?? 0,
-      // Reverse direction if importing from grid
+      id:      'center-grid',
+      from:    'center',
+      to:      'grid',
+      color:   COLORS.grid,
+      watts:   data?.grid?.watts ?? 0,
       reverse: data?.grid?.exporting === false,
     },
   ]
+}
+
+export default function FlowCanvas({ data }) {
+  const flows = buildFlows(data)
+
+  // Refs to invisible <path> elements used for getPointAtLength measurements
+  const pathRefs  = useRef({})
+  const progressRef = useRef({})
+  const rafRef    = useRef(null)
+  const [positions, setPositions] = useState({})
+
+  useEffect(() => {
+    let lastTime = null
+
+    function tick(now) {
+      if (!lastTime) lastTime = now
+      const dt = now - lastTime
+      lastTime = now
+
+      const nextPositions = {}
+
+      flows.forEach(({ id, watts }) => {
+        const duration = wattsToDuration(watts)
+        if (!duration) { nextPositions[id] = []; return }
+
+        if (progressRef.current[id] === undefined) progressRef.current[id] = 0
+        progressRef.current[id] = (progressRef.current[id] + dt / duration) % 1
+
+        const pathEl = pathRefs.current[id]
+        if (!pathEl) { nextPositions[id] = []; return }
+
+        const totalLen = pathEl.getTotalLength()
+        nextPositions[id] = Array.from({ length: PARTICLE_COUNT }, function(_, i) {
+          var t = (progressRef.current[id] + i / PARTICLE_COUNT) % 1
+          var pt = pathEl.getPointAtLength(t * totalLen)
+          return { x: pt.x, y: pt.y }
+        })
+      })
+
+      setPositions(nextPositions)
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
+    rafRef.current = requestAnimationFrame(tick)
+    return function() { cancelAnimationFrame(rafRef.current) }
+  }, [data])
 
   return (
     <svg
@@ -100,64 +125,73 @@ export default function FlowCanvas({ data }) {
       className="absolute inset-0 w-full h-full pointer-events-none"
     >
       <defs>
-        {/* Gradient for each path */}
-        {FLOWS.map(({ id, color, from, to }) => (
-          <linearGradient
-            key={id}
-            id={`grad-${id}`}
-            gradientUnits="userSpaceOnUse"
-            x1={NODE_POS[from].x} y1={NODE_POS[from].y}
-            x2={NODE_POS[to].x}   y2={NODE_POS[to].y}
-          >
-            <stop offset="0%"   stopColor={color} stopOpacity="0.8" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.15" />
-          </linearGradient>
-        ))}
+        {flows.map(function({ id, color, from, to }) {
+          return (
+            <linearGradient
+              key={id}
+              id={'grad-' + id}
+              gradientUnits="userSpaceOnUse"
+              x1={NODE_POS[from].x} y1={NODE_POS[from].y}
+              x2={NODE_POS[to].x}   y2={NODE_POS[to].y}
+            >
+              <stop offset="0%"   stopColor={color} stopOpacity="0.8" />
+              <stop offset="100%" stopColor={color} stopOpacity="0.15" />
+            </linearGradient>
+          )
+        })}
 
-        {/* Glow filter for particles */}
-        {FLOWS.map(({ id, color }) => (
-          <filter key={id} id={`glow-${id}`} x="-150%" y="-150%" width="400%" height="400%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        ))}
+        {flows.map(function({ id }) {
+          return (
+            <filter key={id} id={'glow-' + id} x="-150%" y="-150%" width="400%" height="400%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          )
+        })}
       </defs>
 
-      {FLOWS.map(({ id, from, to, color, watts, reverse }) => {
+      {flows.map(function({ id, from, to, color, watts, reverse }) {
         const pathD = reverse
-          ? bezierPath(NODE_POS[to], NODE_POS[from])  // reverse travel direction
+          ? bezierPath(NODE_POS[to], NODE_POS[from])
           : bezierPath(NODE_POS[from], NODE_POS[to])
-        const duration = wattsToDuration(watts)
+        const pts = positions[id] || []
+        const active = watts > 0
 
         return (
           <g key={id}>
-            {/* Named path used by animateMotion mpath */}
-            <path id={`path-${id}`} d={pathD} fill="none" stroke="none" />
-
-            {/* Glow halo */}
+            {/* Hidden path used only for getPointAtLength measurements */}
             <path
+              ref={function(el) { pathRefs.current[id] = el }}
               d={pathD}
               fill="none"
-              stroke={color}
-              strokeWidth="10"
-              strokeLinecap="round"
-              opacity={watts > 0 ? 0.10 : 0.04}
+              stroke="none"
+            />
+            {/* Glow halo behind line */}
+            <path
+              d={pathD} fill="none"
+              stroke={color} strokeWidth="10" strokeLinecap="round"
+              opacity={active ? 0.10 : 0.04}
             />
             {/* Visible line */}
             <path
-              d={pathD}
-              fill="none"
-              stroke={`url(#grad-${id})`}
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              opacity={watts > 0 ? 1 : 0.2}
+              d={pathD} fill="none"
+              stroke={'url(#grad-' + id + ')'} strokeWidth="2.5" strokeLinecap="round"
+              opacity={active ? 1 : 0.2}
             />
-
-            {/* Animated particles */}
-            <FlowParticles flowId={id} color={color} duration={duration} />
+            {/* JS-driven particles */}
+            {pts.map(function(pt, i) {
+              return (
+                <circle
+                  key={i}
+                  cx={pt.x} cy={pt.y} r="5"
+                  fill={color}
+                  filter={'url(#glow-' + id + ')'}
+                />
+              )
+            })}
           </g>
         )
       })}
