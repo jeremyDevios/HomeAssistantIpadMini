@@ -9,10 +9,13 @@ dist-ssr/
 .vite/
 .cache/
 
-# Local env files
+# Local env files (contain secrets — never commit)
 .env
 .env.local
 .env.*.local
+
+# HA mapping file contains Long-Lived Access Token
+MappingHA.md
 
 # Editor
 .DS_Store

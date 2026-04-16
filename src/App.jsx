@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import FlowDiagram from './components/FlowDiagram'
 import { MOCK_DATA } from './lib/mockData'
+import { useHassData } from './lib/useHassData'
 
 function Clock() {
-  var init = useState(new Date())
-  var now = init[0]
+  var init   = useState(new Date())
+  var now    = init[0]
   var setNow = init[1]
   useEffect(function() {
     var t = setInterval(function() { setNow(new Date()) }, 10000)
@@ -21,9 +22,23 @@ function Clock() {
   )
 }
 
+function StatusDot({ status }) {
+  var color = status === 'connected' ? '#22c55e' : status === 'error' ? '#ef4444' : '#f59e0b'
+  var label = status === 'connected' ? 'Live' : status === 'error' ? 'Erreur HA' : 'Connexion…'
+  return (
+    <div style={{ position: 'absolute', top: 10, right: 14, display: 'flex', alignItems: 'center' }}>
+      <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, marginRight: 5 }} />
+      <span style={{ fontSize: 10, color: color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+        {label}
+      </span>
+    </div>
+  )
+}
+
 export default function App() {
-  var init = useState(MOCK_DATA)
-  var data = init[0]
+  var hass   = useHassData()
+  var data   = hass.data || MOCK_DATA   // fall back to mock while connecting
+  var status = hass.status
 
   return (
     <div style={{
@@ -34,15 +49,16 @@ export default function App() {
       overflow: 'hidden',
       background: '#0d1117',
       boxSizing: 'border-box',
+      position: 'relative',
     }}>
       <Clock />
+      <StatusDot status={status} />
 
-      {/* Flow diagram — takes remaining vertical space */}
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
         <FlowDiagram data={data} />
       </div>
 
-      {/* Charts placeholder */}
+      {/* Charts placeholder — M5 */}
       <div style={{
         flexShrink: 0,
         display: 'flex',
