@@ -11,4 +11,17 @@ export default defineConfig({
       targets: ['ios >= 12', 'safari >= 12'],
     }),
   ],
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':    ['react', 'react-dom'],
+          'vendor-recharts': ['recharts'],
+          'vendor-ha':       ['home-assistant-js-websocket'],
+        },
+      },
+    },
+  },
 })
+

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import FlowDiagram from './components/FlowDiagram'
+import ProductionChart from './components/ProductionChart'
+import BatteryChart from './components/BatteryChart'
 import { MOCK_DATA } from './lib/mockData'
 import { useHassData } from './lib/useHassData'
 
@@ -58,41 +60,35 @@ export default function App() {
         <FlowDiagram data={data} />
       </div>
 
-      {/* Charts placeholder — M5 */}
+      {/* Charts — M5 */}
       <div style={{
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'row',
         alignItems: 'stretch',
         height: '28%',
-        padding: '8px 16px',
+        padding: '10px 16px 12px',
         borderTop: '1px solid rgba(255,255,255,0.05)',
         boxSizing: 'border-box',
       }}>
         <div style={{
           flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
           borderRadius: 12,
           background: 'rgba(255,255,255,0.04)',
+          padding: '10px 12px',
           marginRight: 8,
+          overflow: 'hidden',
         }}>
-          <span style={{ fontSize: 10, color: '#374151', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            Production vs Consommation
-          </span>
+          <ProductionChart />
         </div>
         <div style={{
           flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
           borderRadius: 12,
           background: 'rgba(255,255,255,0.04)',
+          padding: '10px 12px',
+          overflow: 'hidden',
         }}>
-          <span style={{ fontSize: 10, color: '#374151', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            État Batterie
-          </span>
+          <BatteryChart currentSoc={data.battery.soc} />
         </div>
       </div>
     </div>
