@@ -2,71 +2,85 @@ import EnergyNode from './EnergyNode'
 import FlowCanvas from './FlowCanvas'
 import { COLORS } from '../lib/mockData'
 
-export default function FlowDiagram({ data }) {
-  const NODES = [
-    {
-      key: 'solar',
-      type: 'solar',
-      color: COLORS.solar,
-      label: 'Production Solaire',
-      watts: data.solar.watts,
-      pos: { left: '16%', top: '24%' },
-    },
-    {
-      key: 'battery',
-      type: 'battery',
-      color: COLORS.battery,
-      label: 'Stockage Batterie',
-      watts: data.battery.watts,
-      subLabel: `${data.battery.charging ? 'Charge' : 'Décharge'} ${data.battery.soc}%`,
-      pos: { left: '84%', top: '24%' },
-    },
-    {
-      key: 'consumption',
-      type: 'consumption',
-      color: COLORS.consumption,
-      label: 'Consommation Maison',
-      watts: data.consumption.watts,
-      pos: { left: '16%', top: '80%' },
-    },
-    {
-      key: 'grid',
-      type: 'grid',
-      color: COLORS.grid,
-      label: 'Surplus Réseau',
-      watts: data.grid.watts,
-      subLabel: data.grid.exporting ? 'exporté' : 'importé',
-      pos: { left: '84%', top: '80%' },
-    },
-  ]
+var NODES = [
+  {
+    key:   'solar',
+    type:  'solar',
+    label: 'Production Solaire',
+    left:  '16%',
+    top:   '24%',
+  },
+  {
+    key:   'battery',
+    type:  'battery',
+    label: 'Stockage Batterie',
+    left:  '84%',
+    top:   '24%',
+  },
+  {
+    key:   'consumption',
+    type:  'consumption',
+    label: 'Consommation Maison',
+    left:  '16%',
+    top:   '80%',
+  },
+  {
+    key:   'grid',
+    type:  'grid',
+    label: 'Surplus Réseau',
+    left:  '84%',
+    top:   '80%',
+  },
+]
 
+export default function FlowDiagram({ data }) {
   return (
-    <div className="relative w-full h-full">
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+
+      {/* Animated SVG flow lines — fills the container */}
       <FlowCanvas data={data} />
 
-      {NODES.map((n) => (
-        <div
-          key={n.key}
-          className="absolute"
-          style={{ left: n.pos.left, top: n.pos.top, transform: 'translate(-50%, -50%)' }}
-        >
-          <EnergyNode
-            type={n.type}
-            color={n.color}
-            label={n.label}
-            watts={n.watts}
-            subLabel={n.subLabel}
-          />
-        </div>
-      ))}
+      {/* Corner energy nodes — absolutely positioned to match SVG viewBox percentages */}
+      {NODES.map(function(n) {
+        var nodeData = data[n.key] || {}
+        var subLabel = null
+        if (n.key === 'battery') {
+          subLabel = (nodeData.charging ? 'Charge' : 'Décharge') + ' ' + nodeData.soc + '%'
+        } else if (n.key === 'grid') {
+          subLabel = nodeData.exporting ? 'exporté' : 'importé'
+        }
+
+        return (
+          <div
+            key={n.key}
+            style={{
+              position: 'absolute',
+              left: n.left,
+              top: n.top,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <EnergyNode
+              type={n.type}
+              color={COLORS[n.key]}
+              label={n.label}
+              watts={nodeData.watts}
+              subLabel={subLabel}
+            />
+          </div>
+        )
+      })}
 
       {/* Central house node */}
-      <div
-        className="absolute"
-        style={{ left: '50%', top: '52%', transform: 'translate(-50%, -50%)' }}
-      >
+      <div style={{
+        position: 'absolute',
+        left: '50%',
+        top: '52%',
+        transform: 'translate(-50%, -50%)',
+      }}>
         <EnergyNode type="house" color={COLORS.center} label="" watts={null} size="lg" />
       </div>
+
     </div>
   )
 }

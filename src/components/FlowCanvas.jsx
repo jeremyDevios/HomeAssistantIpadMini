@@ -122,7 +122,7 @@ export default function FlowCanvas({ data }) {
     <svg
       viewBox="0 0 1000 540"
       preserveAspectRatio="xMidYMid meet"
-      className="absolute inset-0 w-full h-full pointer-events-none"
+      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', display: 'block' }}
     >
       <defs>
         {flows.map(function({ id, color, from, to }) {
