@@ -26,8 +26,10 @@ function mapEntities(entities) {
   var batteryRaw = num(entities, ENTITY_BATTERY)    // + = discharging, - = charging
   var soc        = num(entities, ENTITY_SOC)
 
-  // Consumption derived from user formula
-  var consumption = Math.max(0, gridRaw - solar - batteryRaw)
+  // Energy balance: consumption = solar + grid_import_or_export + battery_discharge_or_charge
+  // gridRaw: + = importing from grid, - = exporting to grid
+  // batteryRaw: + = discharging (power out), - = charging (power in)
+  var consumption = Math.max(0, solar + gridRaw + batteryRaw)
 
   return {
     solar: {

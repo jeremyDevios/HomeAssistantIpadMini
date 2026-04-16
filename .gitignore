@@ -17,6 +17,34 @@ dist-ssr/
 # HA mapping file contains Long-Lived Access Token
 MappingHA.md
 
+# Local history data (generated at runtime, never commit)
+data/
+
+# Editor
+.DS_Store
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build output
+dist/
+dist-ssr/
+
+# Vite cache
+.vite/
+.cache/
+
+# Local env files (contain secrets — never commit)
+.env
+.env.local
+.env.*.local
+
+# HA mapping file contains Long-Lived Access Token
+MappingHA.md
+
 # Editor
 .DS_Store
 .idea/
