@@ -22,44 +22,34 @@ function num(entities, id) {
 
 function mapEntities(entities) {
   var solar      = Math.max(0, num(entities, ENTITY_SOLAR))
-  var gridRaw    = num(entities, ENTITY_GRID)       // + = import, - = export
-  var batteryRaw = num(entities, ENTITY_BATTERY)    // + = discharging, - = charging
+  var gridRaw    = num(entities, ENTITY_GRID)
+  var batteryRaw = num(entities, ENTITY_BATTERY)
   var soc        = num(entities, ENTITY_SOC)
-
-  // Energy balance: consumption = solar + grid_import_or_export + battery_discharge_or_charge
-  // gridRaw: + = importing from grid, - = exporting to grid
-  // batteryRaw: + = discharging (power out), - = charging (power in)
   var consumption = Math.max(0, solar + gridRaw + batteryRaw)
 
   return {
-    solar: {
-      watts: Math.round(solar),
-    },
-    battery: {
-      watts:    Math.round(Math.abs(batteryRaw)),
-      charging: batteryRaw < 0,   // negative = charging
-      soc:      Math.round(soc),
-    },
-    consumption: {
-      watts: Math.round(consumption),
-    },
-    grid: {
-      watts:     Math.round(Math.abs(gridRaw)),
-      exporting: gridRaw < 0,     // negative = export
-    },
+    solar:       { watts: Math.round(solar) },
+    battery:     { watts: Math.round(Math.abs(batteryRaw)), charging: batteryRaw < 0, soc: Math.round(soc) },
+    consumption: { watts: Math.round(consumption) },
+    grid:        { watts: Math.round(Math.abs(gridRaw)), exporting: gridRaw < 0 },
   }
 }
 
 export function useHassData() {
-  var initState = useState(null)
-  var data      = initState[0]
-  var setData   = initState[1]
+  var s0      = useState(null)
+  var data    = s0[0]; var setData = s0[1]
 
-  var initStatus = useState('connecting')
-  var status     = initStatus[0]
-  var setStatus  = initStatus[1]
+  var s1      = useState('connecting')
+  var status  = s1[0]; var setStatus = s1[1]
 
   useEffect(function() {
+    // Guard: catch missing .env — Vite replaces undefined vars with the string "undefined"
+    if (!HA_URL || !HA_TOKEN || HA_URL === 'undefined' || HA_TOKEN === 'undefined') {
+      console.error('[HA] VITE_HA_URL or VITE_HA_TOKEN is missing. Check your .env file and rebuild.')
+      setStatus('error')
+      return
+    }
+
     var conn   = null
     var unsub  = null
     var active = true
@@ -67,12 +57,28 @@ export function useHassData() {
     async function connect() {
       try {
         var auth = createLongLivedTokenAuth(HA_URL, HA_TOKEN)
-        conn = await createConnection({ auth })
+
+        conn = await createConnection({
+          auth,
+          setupRetry: Infinity,   // retry initial connect forever (HA may be temporarily down)
+        })
+
         if (!active) { conn.close(); return }
+
+        // Track connection lifecycle to update the status dot
+        conn.addEventListener('ready', function() {
+          if (active) setStatus('connected')
+        })
+        conn.addEventListener('disconnected', function() {
+          if (active) setStatus('connecting')  // show CONNEXION... while reconnecting
+        })
+
         setStatus('connected')
+
         unsub = subscribeEntities(conn, function(entities) {
           setData(mapEntities(entities))
         })
+
       } catch (err) {
         console.error('[HA] connection failed:', err)
         if (active) setStatus('error')

@@ -24,9 +24,13 @@ function Clock() {
   )
 }
 
-function StatusDot({ status }) {
+function StatusDot({ status, wasConnected }) {
   var color = status === 'connected' ? '#22c55e' : status === 'error' ? '#ef4444' : '#f59e0b'
-  var label = status === 'connected' ? 'Live' : status === 'error' ? 'Erreur HA' : 'Connexion…'
+  var label = status === 'connected'
+    ? 'Live'
+    : status === 'error'
+      ? 'Erreur HA — vérifiez .env'
+      : wasConnected ? 'Reconnexion…' : 'Connexion…'
   return (
     <div style={{ position: 'absolute', top: 10, right: 14, display: 'flex', alignItems: 'center' }}>
       <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, marginRight: 5 }} />
@@ -39,8 +43,16 @@ function StatusDot({ status }) {
 
 export default function App() {
   var hass   = useHassData()
-  var data   = hass.data || MOCK_DATA   // fall back to mock while connecting
+  var data   = hass.data || MOCK_DATA
   var status = hass.status
+
+  // Remember if we ever had a successful connection (to show "Reconnexion…" vs "Connexion…")
+  var wc0          = useState(false)
+  var wasConnected = wc0[0]
+  var setWasConn   = wc0[1]
+  useEffect(function() {
+    if (status === 'connected') setWasConn(true)
+  }, [status])
 
   return (
     <div style={{
@@ -54,7 +66,7 @@ export default function App() {
       position: 'relative',
     }}>
       <Clock />
-      <StatusDot status={status} />
+      <StatusDot status={status} wasConnected={wasConnected} />
 
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
         <FlowDiagram data={data} />
